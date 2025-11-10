@@ -1,5 +1,5 @@
 // ~ Database Config ~
-import './config/db.config.js';
+import './src/config/db.config.js';
 
 // ~ Dependencies ~
 import express from 'express';
@@ -7,14 +7,14 @@ import cors from 'cors';
 import path from 'path';
 import helmet from 'helmet';
 import httpErrors from 'http-errors';
-import env from './common/constants/env.constants.js';
+import env from './src/common/constants/env.constants.js';
 
 // ~ Routes ~
-import authRoutes from './routes/auth.routes.js';
-import userRoutes from './routes/user.routes.js';
-import studentRoutes from './routes/student.routes.js';
-import sessionRoutes from './routes/session.routes.js';
-import formRoutes from './routes/form.routes.js';
+import authRoutes from './src/routes/auth.routes.js';
+import userRoutes from './src/routes/user.routes.js';
+import studentRoutes from './src/routes/student.routes.js';
+import sessionRoutes from './src/routes/session.routes.js';
+import formRoutes from './src/routes/form.routes.js';
 
 
 const app = express();
