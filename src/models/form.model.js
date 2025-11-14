@@ -12,14 +12,20 @@ export const FormSchema = new Schema(
             ref: "Student",
             required: [true, "Student ID is required"]
         },
-        formName: {
+        sessionID: {
+            type: Schema.Types.ObjectId,
+            ref: "Session",
+            required: [true, "Session ID is required"]
+        },
+        formType: {
             type: String,
-            required: [true, 'Form Name is required']
+            required: [true, 'Form Type is required'],
+            enum: ["regular-form", "improvement-form"],
         },
         formStatus: {
             type: String,
-            required: [true, 'Form Status is required'],
             enum: ["pending", "approved"],
+            default: "pending"
         },
         subjects: {
             type: [String],

@@ -1,26 +1,28 @@
+import { isValidObjectId } from 'mongoose';
 import { SessionModel } from '../models/session.model.js';
 import { handleMongooseValidation } from '../common/utils/mongooseValidator.js';
 
 
-export const addSession = async (request, response) => {
+// ~ Add New Session ~
+export const addSession = async (req, res) => {
     try {
-        const data = request?.body;
-        const session = await SessionModel.create(data);
-        return response.status(201).json({ data: session });
+        const session = await SessionModel.create(req?.body);
+        return res.status(201).json({ session });
     } catch (error) {
-        if (error.name === 'ValidationError' || error.name === 'MongoServerError') {
-            return response.status(422).json({ error: handleMongooseValidation(error, "Session") });
-        } else {
-            console.log(error);
-            return response.status(500).json({ error: "Internal Server Error" });
+        if (['ValidationError', 'MongoServerError'].includes(error.name)) {
+            return res.status(422).json({ error: handleMongooseValidation(error, "Session") });
         }
+
+        console.error(error);
+        return res.status(500).json({ error: "Internal Server Error" });
     }
 }
 
 
-export const getSessions = async (request, response) => {
+// ~ Get Sessions ~
+export const getSessions = async (req, res) => {
     try {
-        const { search = "", sort = "sessionName", order = "asc", page = 1, limit = 20, ...filters } = request.query;
+        const { search = "", sort = "sessionName", order = "asc", page = 1, limit = 20, ...filters } = req.query;
 
         // Whitelist fields allowed for sorting (prevents query abuse)
         const allowedSortFields = ["sessionName", "batch", "createdAt"];
@@ -47,7 +49,7 @@ export const getSessions = async (request, response) => {
         const sessions = await SessionModel.find(query).sort({ [sortField]: sortOrder }).skip((pageNum - 1) * limitNum).limit(limitNum).lean().exec();
         const total = await SessionModel.countDocuments(query);
 
-        return response.status(200).json({
+        return res.status(200).json({
             sessions,
             pagination: {
                 total,
@@ -58,26 +60,41 @@ export const getSessions = async (request, response) => {
         });
     } catch (error) {
         console.error("Error fetching sessions:", error);
-        return response.status(500).json({ message: "Something went wrong while fetching session records." });
+        return res.status(500).json({ message: "Something went wrong while fetching session records." });
     }
 };
 
 
-export const getSingleSession = async (request, response) => {
+// ~ Get Single Session ~
+export const getSingleSession = async (req, res) => {
     try {
-        const session = await SessionModel.findById(request.params.id);
-        return response.status(200).json({ session });
+        const sessionID = req.params.id;
+        if (!isValidObjectId(sessionID)) return res.status(400).json({ message: "Invalid session ID" });
+
+        const session = await SessionModel.findById(sessionID);
+        if (!session) return res.status(404).json({ message: "Session not found" });
+
+        return res.status(200).json({ session });
     } catch (error) {
-        console.log(error);
-        return response.status(500).json({ error: "Internal Server Error" });
+        console.error(error);
+        return res.status(500).json({ error: "Internal Server Error" });
     }
 }
 
 
-export const updateSession = async (request, response) => {
+// ~ Update Session ~
+export const updateSession = async (req, res) => {
     try {
-        const data = request?.body;
         let programs = [];
+
+        const sessionID = req.params.id;
+        if (!isValidObjectId(sessionID)) return res.status(400).json({ message: "Invalid session ID" });
+
+        const data = req.body;
+        if (!data || Object.keys(data).length === 0) return res.status(400).json({ message: "req body cannot be empty" });
+
+        const session = await SessionModel.findById(sessionID);
+        if (!session) return res.status(404).json({ message: "Session not found" });
 
         if (Array.isArray(data.programs)) {
             programs = data.programs;
@@ -89,27 +106,32 @@ export const updateSession = async (request, response) => {
         const endDate = data.endDate ? new Date(data.endDate) : null;
         const updatedData = { ...data, programs, ...(startDate && { startDate }), ...(endDate && { endDate }) };
 
-        const session = await SessionModel.findByIdAndUpdate(request.params.id, updatedData, { new: true, runValidators: true });
-        if (!session) {return response.status(404).json({ error: "Session not found" });}
-
-        return response.status(200).json({ message: "Session updated successfully", session });
+        const updated = await SessionModel.findByIdAndUpdate(sessionID, updatedData, { new: true, runValidators: true });
+        return res.status(200).json({ session: updated });
     } catch (error) {
-        if (error.name === 'ValidationError' || error.name === 'MongoServerError') {
-            return response.status(422).json({ error: handleMongooseValidation(error, "Session") });
-        } else {
-            console.error(error);
-            return response.status(500).json({ error: "Internal Server Error" });
+        if (['ValidationError', 'MongoServerError'].includes(error.name)) {
+            return res.status(422).json({ error: handleMongooseValidation(error, "Session") });
         }
+
+        console.error(error);
+        return res.status(500).json({ error: "Internal Server Error" });
     }
 };
 
 
-export const deleteSession = async (request, response) => {
+// ~ Delete Session ~
+export const deleteSession = async (req, res) => {
     try {
-        const deleted = await SessionModel.findByIdAndDelete(request.params.id);
-        if (deleted) return response.status(200).json({ message: "Session Successfully Deleted" });
+        const sessionID = req.params.id;
+        if (!isValidObjectId(sessionID)) return res.status(400).json({ message: "Invalid session ID" });
+
+        const session = await SessionModel.findById(sessionID);
+        if (!session) return res.status(404).json({ message: "session not found" });
+
+        await SessionModel.findByIdAndDelete(sessionID);
+        return res.status(200).json({ message: "Session successfully deleted" });
     } catch (error) {
-        console.log(error);
-        return response.status(500).json({ error: "Internal Server Error" });
+        console.error(error);
+        return res.status(500).json({ error: "Internal Server Error" });
     }
 }

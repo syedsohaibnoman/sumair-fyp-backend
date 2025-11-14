@@ -5,29 +5,30 @@ import { handleMongooseValidation } from '../common/utils/mongooseValidator.js';
 
 
 // ~ Add New Student ~
-export const addStudent = async (request, response) => {
+export const addStudent = async (req, res) => {
     try {
-        const data = request?.body;
-        const student = await StudentModel.create(data);
+        const student = await StudentModel.create(req?.body);
         const user = await studentAccount(student);
 
         student.userID = user._id;
         await student.save();
 
-        response.status(201).json({ data: student });
+        res.status(201).json({ student });
     } catch (error) {
-        if (['ValidationError', 'MongoServerError'].includes(error.name)) return response.status(422).json({ error: handleMongooseValidation(error, "Student") });
+        if (['ValidationError', 'MongoServerError'].includes(error.name)) {
+            return res.status(422).json({ error: handleMongooseValidation(error, "Student") })
+        };
 
-        console.log(error);
-        response.status(500).json({ error: "Internal Server Error" });
+        console.error(error);
+        res.status(500).json({ error: "Internal Server Error" });
     }
 }
 
 
 // ~ Get All Students ~
-export const getStudents = async (request, response) => {
+export const getStudents = async (req, res) => {
     try {
-        const { search = "", sort = "fullName", order = "asc", page = 1, limit = 20, ...filters } = request.query;
+        const { search = "", sort = "fullName", order = "asc", page = 1, limit = 20, ...filters } = req.query;
 
         // Whitelist fields allowed for sorting (prevents query abuse)
         const allowedSortFields = ["fullName", "batch", "createdAt"];
@@ -54,7 +55,7 @@ export const getStudents = async (request, response) => {
         const students = await StudentModel.find(query).sort({ [sortField]: sortOrder }).skip((pageNum - 1) * limitNum).limit(limitNum).lean().exec();
         const total = await StudentModel.countDocuments(query);
 
-        return response.status(200).json({
+        return res.status(200).json({
             students,
             pagination: {
                 total,
@@ -65,67 +66,69 @@ export const getStudents = async (request, response) => {
         });
     } catch (error) {
         console.error("Error fetching students:", error);
-        return response.status(500).json({ message: "Something went wrong while fetching student records." });
+        return res.status(500).json({ message: "Something went wrong while fetching student records." });
     }
 };
 
 
 // ~ Get Single Student ~
-export const getSingleStudent = async (request, response) => {
+export const getSingleStudent = async (req, res) => {
     try {
-        const studentID = request.params.id;
-        if (!isValidObjectId(studentID)) return response.status(400).json({ message: "Invalid MongoDB objectID" });
+        const studentID = req.params.id;
+        if (!isValidObjectId(studentID)) return res.status(400).json({ message: "Invalid student ID" });
 
-        const student = await StudentModel.findById(studentID);
-        if (!student) return response.status(404).json({ message: "Student not found" });
+        const single = await StudentModel.findById(studentID);
+        if (!single) return res.status(404).json({ message: "Student not found" });
 
-        return response.status(200).json({ student });
+        return res.status(200).json({ student: single });
     } catch (error) {
-        console.log(error);
-        return response.status(500).json({ error: "Internal server error" });
+        console.error(error);
+        return res.status(500).json({ error: "Internal server error" });
     }
 }
 
 
 // ~ Update Student ~
-export const updateStudent = async (request, response) => {
+export const updateStudent = async (req, res) => {
     try {
-        const studentID = request.params.id;
-        if (!isValidObjectId(studentID)) return response.status(400).json({ message: "Invalid MongoDB objectID" });
+        const studentID = req.params.id;
+        if (!isValidObjectId(studentID)) return res.status(400).json({ message: "Invalid student ID" });
 
-        const data = request.body;
-        if (!data || Object.keys(data).length === 0) return response.status(400).json({ message: "Request body cannot be empty" });
+        const data = req.body;
+        if (!data || Object.keys(data).length === 0) return res.status(400).json({ message: "req body cannot be empty" });
 
         const student = await StudentModel.findById(studentID);
-        if (!student) return response.status(404).json({ message: "Student not found" });
+        if (!student) return res.status(404).json({ message: "Student not found" });
 
-        const update = await StudentModel.findByIdAndUpdate(studentID, data, { new: true });
-        return response.status(200).json({ student: update });
+        const updated = await StudentModel.findByIdAndUpdate(studentID, data, { new: true });
+        return res.status(200).json({ student: updated });
     } catch (error) {
-        if (['ValidationError', 'MongoServerError'].includes(error.name)) return response.status(422).json({ error: handleMongooseValidation(error, "Student") });
+        if (['ValidationError', 'MongoServerError'].includes(error.name)) {
+            return res.status(422).json({ error: handleMongooseValidation(error, "Student") })
+        };
 
-        console.log(error);
-        return response.status(500).json({ error: "Internal Server Error" });
+        console.error(error);
+        return res.status(500).json({ error: "Internal Server Error" });
     }
 }
 
 
 // ~ Delete Student ~
-export const deleteStudent = async (request, response) => {
+export const deleteStudent = async (req, res) => {
     try {
-        const studentID = request.params.id;
-        if (!isValidObjectId(studentID)) return response.status(400).json({ message: "Invalid MongoDB objectID" });
+        const studentID = req.params.id;
+        if (!isValidObjectId(studentID)) return res.status(400).json({ message: "Invalid student ID" });
 
         const student = await StudentModel.findById(studentID);
-        if (!student) return response.status(404).json({ message: "Student not found" });
+        if (!student) return res.status(404).json({ message: "Student not found" });
 
         await UserModel.findByIdAndDelete(student.userID);
         await StudentModel.findByIdAndDelete(student._id);
 
-        return response.status(200).json({ message: "Student Successfully Deleted" });
+        return res.status(200).json({ message: "Student successfully deleted" });
     } catch (error) {
-        console.log(error);
-        return response.status(500).json({ error: "Internal Server Error" });
+        console.error(error);
+        return res.status(500).json({ error: "Internal Server Error" });
     }
 }
 
@@ -136,7 +139,7 @@ const studentAccount = async (student) => {
         const user = await UserModel.create({ fullName: student?.fullName, email: student?.email, password: student?.email });
         return user;
     } catch (error) {
-        if (error.name === 'ValidationError' || error.name === 'MongoServerError') {
+        if (['ValidationError', 'MongoServerError'].includes(error.name)) {
             return { error: handleMongooseValidation(error, "User") };
         }
 

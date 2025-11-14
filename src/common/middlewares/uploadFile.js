@@ -1,21 +1,40 @@
-import multer, { diskStorage } from "multer";
-import { extname } from "path";
+import multer, { diskStorage } from 'multer';
+import { extname, join } from 'path';
+import fs from 'fs';
 
-export function uploadFiles(fields) {
+
+export const uploadFiles = (fields) => {
+    const uploadDir = join(process.cwd(), "uploads");
+
+    if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
     const storage = diskStorage({
         destination: (req, file, cb) => {
-            cb(null, "uploads/");
+            cb(null, uploadDir);
         },
         filename: (req, file, cb) => {
             try {
-                const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-                const ext = extname(file.originalname);
-                cb(null, `${uniqueSuffix}${ext}`);
+                const timestamp = Date.now();
+                const random = Math.round(Math.random() * 1e9);
+                const ext = extname(file.originalname).toLowerCase();
+                cb(null, `${timestamp}-${random}${ext}`);
             } catch (error) {
-                cb(error, false);
+                cb(error, null);
             }
-        }
+        },
     });
 
-    return multer({ storage }).fields(fields);
+    const fileFilter = (req, file, cb) => {
+        const allowed = ["image/jpeg", "image/png", "image/webp"];
+        if (allowed.includes(file.mimetype)) cb(null, true);
+        else cb(new Error("Invalid file type. Only JPEG, PNG, and WEBP are allowed."));
+    };
+
+    const limits = {
+        fileSize: 5 * 1024 * 1024, // 5 MB per file
+    };
+
+    return multer({ storage, fileFilter, limits }).fields(fields);
 }
